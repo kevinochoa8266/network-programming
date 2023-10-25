@@ -9,9 +9,10 @@ public class PeerInfoParser {
     private String hostName;
     private int portNumber;
     private boolean hasFile;
-
+    // Array of all Peer objects
+    //private ArrayList<Peer> peers = new ArrayList<Peer>();
     private final String filename = "./PeerInfo.cfg";
-
+// TODO: This doesnt add all the Peers from the PeerInfo file, this should add all Peers to an Array
     public void readFile() {
         try {
             BufferedReader reader = new BufferedReader(new FileReader(filename));
@@ -29,7 +30,7 @@ public class PeerInfoParser {
             e.printStackTrace();
         }
         // Enable for Debugging
-        //printVals();
+        printVals();
     }
 
     public ArrayList<Integer> getIdList() {
