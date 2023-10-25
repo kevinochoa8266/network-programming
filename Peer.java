@@ -7,6 +7,7 @@ public class Peer {
     private byte[] bitfield;
     private boolean interested;
 
+
     public int getMyPeerId() {
         return myPeerId;
     }

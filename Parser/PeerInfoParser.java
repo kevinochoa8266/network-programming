@@ -28,6 +28,8 @@ public class PeerInfoParser {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        // Enable for Debugging
+        //printVals();
     }
 
     public ArrayList<Integer> getIdList() {
@@ -62,4 +64,13 @@ public class PeerInfoParser {
     public boolean HasFile() {
         return hasFile;
     }
+    // EARLY DEBUGGING
+    public void printVals() {
+        System.out.println("PeerID: " + peerId);
+        System.out.println("HostName: " + hostName);
+        System.out.println("PortNumber: " + portNumber);
+        System.out.println("HasFile: " + hasFile);
+
+    }
+
 }
