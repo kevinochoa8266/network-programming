@@ -42,8 +42,9 @@ public class CommonParser {
             e.printStackTrace();
         }
         // Enable for Debugging
-        //printVals();
+        printVals();
     }
+
 
     public int getNumberOfPreferredNeighbors() {
         return numberOfPreferredNeighbors;

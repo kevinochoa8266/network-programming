@@ -10,7 +10,7 @@ public class PeerInfoParser {
     private int portNumber;
     private boolean hasFile;
 
-    private final String filename = "../PeerInfo.cfg";
+    private final String filename = "./PeerInfo.cfg";
 
     public void readFile() {
         try {
