@@ -4,12 +4,14 @@ import java.io.*;
 import java.util.ArrayList;
 
 public class PeerInfoParser {
-
+    /*
     private int peerId;
     private String hostName;
     private int portNumber;
     private boolean hasFile;
 
+     */
+    private ArrayList<PeerInfo> peerInfoList = new ArrayList<>();
     private final String filename = "./PeerInfo.cfg";
 
     public void readFile() {
@@ -19,10 +21,13 @@ public class PeerInfoParser {
             while ((line = reader.readLine()) != null) {
                 String[] token = line.split(" ");
 
-                peerId = Integer.parseInt(token[0]);
-                hostName = token[1];
-                portNumber = Integer.parseInt(token[2]);
-                hasFile = "1".equals(token[3]);
+                int peerId = Integer.parseInt(token[0]);
+                String hostName = token[1];
+                int portNumber = Integer.parseInt(token[2]);
+                boolean hasFile = "1".equals(token[3]);
+
+                PeerInfo peerInfo = new PeerInfo(peerId, hostName, portNumber, hasFile);
+                peerInfoList.add(peerInfo);
             }
             reader.close();
         } catch (IOException e) {
@@ -30,7 +35,12 @@ public class PeerInfoParser {
         }
     }
 
+    public ArrayList<PeerInfo> getPeerInfoList(){
+        return peerInfoList;
+    }
     public ArrayList<Integer> getIdList() {
+
+        /*
         ArrayList<Integer> list = new ArrayList<Integer>();
         try {
             BufferedReader reader = new BufferedReader(new FileReader(filename));
@@ -43,23 +53,43 @@ public class PeerInfoParser {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        */
+        ArrayList<Integer> list = new ArrayList<>();
+        for (PeerInfo peerInfo : peerInfoList) {
+            list.add(peerInfo.getPeerID());
+        }
+
         return list;
     }
 
 
-    public int getPeerID() {
-        return peerId;
-    }
+    public static class PeerInfo {
+        private int peerId;
+        private String hostName;
+        private int portNumber;
+        private boolean hasFile;
 
-    public String getHostName() {
-        return hostName;
-    }
+        public PeerInfo(int peerId, String hostName, int portNumber, boolean hasFile) {
+            this.peerId = peerId;
+            this.hostName = hostName;
+            this.portNumber = portNumber;
+            this.hasFile = hasFile;
+        }
 
-    public int getPortNumber() {
-        return portNumber;
-    }
+        public int getPeerID() {
+            return peerId;
+        }
 
-    public boolean HasFile() {
-        return hasFile;
+        public String getHostName() {
+            return hostName;
+        }
+
+        public int getPortNumber() {
+            return portNumber;
+        }
+
+        public boolean hasFile() {
+            return hasFile;
+        }
     }
 }

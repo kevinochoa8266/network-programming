@@ -29,10 +29,10 @@ private final ByteBuffer buffer;
             for (int j = start; j < end; j++){
                 int bitLocation = j % 8;
                 // important variable
-                int mask = 1 << (7 - start);
+                int mask = 1 << (7 - bitLocation);
                 if(bitfieldData[j] == 1){
                     //
-                    tempbyte |= (1 << (7-(j%8)));
+                    tempbyte |= mask;
                 }
             }
             buffer.put(tempbyte);

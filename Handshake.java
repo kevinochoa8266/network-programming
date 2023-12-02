@@ -24,10 +24,27 @@ public class Handshake {
         buffer.rewind();
     }
 
+    public Handshake(byte[] receivedBytes){
+        buffer = ByteBuffer.wrap(receivedBytes);
+    }
+
     public byte[] getBytes() {
         byte[] message = new byte[HANDSHAKE_HEADER_LENGTH + ZERO_BITS_LENGTH + PEER_ID_LENGTH];
+        buffer.rewind();
         buffer.get(message);
         return message;
+    }
+
+    public String getHandshakeHeader(){
+        byte[] headerBytes = new byte[HANDSHAKE_HEADER_LENGTH];
+        buffer.position(0);
+        buffer.get(headerBytes);
+        return new String(headerBytes);
+    }
+
+    public int getPeerId(){
+        buffer.position(HANDSHAKE_HEADER_LENGTH + ZERO_BITS_LENGTH);
+        return buffer.getInt();
     }
 
 }
