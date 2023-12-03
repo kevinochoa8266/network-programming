@@ -1,5 +1,4 @@
 import Message.*;
-import Parser.PeerInfoParser;
 
 import java.net.Socket;
 import java.io.IOException;
@@ -12,6 +11,7 @@ public class Peer {
     private Socket socket;
     private byte[] bitfield;
     private boolean interested;
+
 
     public int getMyPeerId() {
         return myPeerId;
