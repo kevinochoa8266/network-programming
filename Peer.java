@@ -279,15 +279,6 @@ public class Peer {
         }
     }
 
-    public void initConnection(PeerInfoParser.PeerInfo peerinfo){
-        try {
-            Socket peerSocket = new Socket(peerinfo.getHostName(), peerinfo.getPortNumber());
-            setSocket(peerSocket);
-        } catch (IOException e) {
-            e.printStackTrace();
-            // connection error handle
-        }
-    }
 
     public void initServer(PeerInfoParser.PeerInfo peerinfo){
         try {
@@ -313,6 +304,30 @@ public class Peer {
     public Peer(PeerInfo peerInfo) {
         this.peerInfo = peerInfo;
     }
+
+    public boolean initClientConnection(PeerInfoParser.PeerInfo origPeer, PeerInfoParser.PeerInfo desiredPeer){
+        this.origID = peerInfo.getPeerID();
+
+        try (Socket socket = new Socket(desiredPeer.getHostName(), desiredPeer.getPortNumber())) {
+            System.out.println("Connected to server on port " + desiredPeer.getPortNumber());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        /* 
+        try {
+
+
+            Socket peerSocket = new Socket(peerinfo.getHostName(), peerinfo.getPortNumber());
+            setSocket(peerSocket);
+        } catch (IOException e) {
+            e.printStackTrace();
+            // connection error handle
+        }
+        
+        */
+        return false;
+    }
+
     
     // Gets called from PeerServer, when a new connection is coming in.
     public void connect(Socket clientSocket) throws IOException {

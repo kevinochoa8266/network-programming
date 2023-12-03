@@ -39,8 +39,30 @@ public class peerProcess {
         // Create a server
         serverSocket = new ServerSocket(myPeerInfo.getPortNumber());
         System.out.println("Server started on port " + myPeerInfo.getPortNumber());
+
+        // Connect to earlier peers 
+        connectToEarlierPeers();
+
+
         // Listen for new connections in a separate thread
         listenForNewConnections();
+    }
+// What I was last working on
+    private void connectToEarlierPeers() {
+        System.out.println("Connecting to earlier peers");
+        PeerInfoParser peerInfoParser = new PeerInfoParser();
+        peerInfoParser.readFile();
+        for (PeerInfo peerInfo : peerInfoParser.getPeerInfoList()) {
+            if (peerInfo.getPeerID() < myPeerId) {
+                Peer desiredPeer = new Peer(peerInfo);
+                boolean status = desiredPeer.initClientConnection(myPeerInfo, peerInfo);
+                if (status == true) {
+                    connectedPeers.add(desiredPeer);
+                }else {
+                    System.out.println("Failed to connect to peer " + peerInfo.getPeerID());
+                }
+            }
+        }
     }
 
 
