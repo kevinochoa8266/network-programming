@@ -5,6 +5,7 @@ import java.util.Arrays;
 public class ServerTestClient {
     private String host;
     private int port;
+    private int remotePeerId;
 
     public ServerTestClient(String host, int port) {
         this.host = host;
@@ -50,17 +51,20 @@ public class ServerTestClient {
             }
 
 
-/* 
             // Read and print the response from the server
+            byte[] receivedBytes = null;
             try {
-                Object response = in.readObject();
-                if (response instanceof String) {
-                    System.out.println("Server says: " + response);
-                }
+                ObjectInputStream inStream = new ObjectInputStream(socket.getInputStream());
+			    receivedBytes = (byte[]) inStream.readObject();
+                Handshake receivedHandshake = new Handshake(receivedBytes);
+                System.out.println("Got:" + receivedBytes.toString());
+                System.out.println("Got:" + receivedHandshake.getHandshakeHeader());
+                System.out.println("Got:" + receivedHandshake.getPeerId());
+                remotePeerId = (receivedHandshake.getPeerId());
             } catch (ClassNotFoundException e) {
                 System.out.println("Class not found: " + e.getMessage());
             }
-*/
+
             // Close the connection
             socket.close();
             System.out.println("Disconnected from server");

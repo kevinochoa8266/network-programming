@@ -60,7 +60,7 @@ public class peerProcess {
     // Whenever a new connection comes in, this handles it for the server.
     private void handleNewConnection(Socket clientSocket) {
         try {
-            Peer newPeer = new Peer(null); // Creates a Peer object for the incoming connection. Does not set PeerInfo yet
+            Peer newPeer = new Peer(myPeerInfo); // Creates a Peer object for the incoming connection. Sets to this peer's number for now.
 
             newPeer.connect(clientSocket); // Uses the Peer class to establish a connection and perform handshake. Passes in the socket.
 

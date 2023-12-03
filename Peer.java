@@ -304,9 +304,10 @@ public class Peer {
 
 
 
-    private ObjectOutputStream outputStream;
-    private ObjectInputStream inputStream;
+   // private ObjectOutputStream outputStream;
+   // private ObjectInputStream inputStream;
     private boolean isConnected;
+    private int origID;
 
     private PeerInfo peerInfo;
     public Peer(PeerInfo peerInfo) {
@@ -315,8 +316,9 @@ public class Peer {
     
     // Gets called from PeerServer, when a new connection is coming in.
     public void connect(Socket clientSocket) throws IOException {
+        this.origID = peerInfo.getPeerID(); // Yes, even though this peer class is for the incoming peer, we initially give it the host's peer ID.
         this.socket = clientSocket; // client socket is the incoming connection. This whole peer class is the incoming connection.
-        //outputStream = new ObjectOutputStream(socket.getOutputStream());
+       // outputStream = new ObjectOutputStream(socket.getOutputStream());
         //inputStream = new ObjectInputStream(socket.getInputStream());
         isConnected = true;
     
@@ -355,18 +357,38 @@ public class Peer {
             setRemotePeerId(receivedHandshake.getPeerId());
             // Now that we know the peer ID thats coming in, we can set the null peerInfo object equal to the one we have in the peerInfo list.
             PeerInfoParser peerInfoParser = new PeerInfoParser();
+            boolean success = false;
             for (PeerInfo peerInfo : peerInfoParser.getPeerInfoList()) {
                 if (peerInfo.getPeerID() == remotePeerId) {
                     this.peerInfo = peerInfo;
+                    success = true;
                     break;
                 }
+            }
+            if (success == false) {
+                System.out.println("ALERT: Peer ID not found in peer info list. USING duplicate peer ID.");
             }
 		} catch (IOException e) {
 			System.err.println(e);
 		} catch (ClassNotFoundException e) {
 			System.err.println(e);
 		}
+        
+
+        // Send handshake message
+        try {
+            System.out.println("Sending handshake to client");
+            ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+            Handshake handshakeMessage = new Handshake(origID);
+            byte[] handshakeBytes = handshakeMessage.getBytes();
+            out.writeObject(handshakeBytes);
+            out.flush();
+            System.out.println("Sent handshake to client");
+        } catch (Exception e) {
+            System.out.println("Error sending handshake message: " + e.getMessage());
         }
+    }
+
 
         /*
         // Receive handshake message
