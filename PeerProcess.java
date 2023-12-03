@@ -20,11 +20,15 @@ public class peerProcess {
     }
 
     public void start() throws IOException {
+
+        // Reads The PeerInfo.cfg file and common.cfg file
         PeerInfoParser peerInfoParser = new PeerInfoParser();
         peerInfoParser.readFile();
         CommonParser commonParser = new CommonParser();
         commonParser.readFile();
-        // Find the right PeerInfo object for the current peer
+
+
+        // Find the right PeerInfo object for the current peer, sets it to myPeerInfo
         for (PeerInfo peerInfo : peerInfoParser.getPeerInfoList()) {
             if (peerInfo.getPeerID() == myPeerId) {
                 myPeerInfo = peerInfo;
@@ -32,9 +36,10 @@ public class peerProcess {
             }
         }
 
+        // Create a server
         serverSocket = new ServerSocket(myPeerInfo.getPortNumber());
         System.out.println("Server started on port " + myPeerInfo.getPortNumber());
-
+        // Listen for new connections in a separate thread
         listenForNewConnections();
     }
 
@@ -52,10 +57,13 @@ public class peerProcess {
         }
     }
     
+    // Whenever a new connection comes in, this handles it for the server.
     private void handleNewConnection(Socket clientSocket) {
         try {
-            Peer newPeer = new Peer(null); // Temporarily pass null as PeerInfo
-            newPeer.connect(clientSocket); // Establishes connection and performs handshake
+            Peer newPeer = new Peer(null); // Creates a Peer object for the incoming connection. Does not set PeerInfo yet
+
+            newPeer.connect(clientSocket); // Uses the Peer class to establish a connection and perform handshake. Passes in the socket.
+
             int connectedPeerId = newPeer.getRemotePeerId(); // Retrieve peer ID from handshake
 
             PeerInfoParser peerInfoParser = new PeerInfoParser(); // Declare and initialize peerInfoParser

@@ -1,7 +1,9 @@
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 
-public class Handshake {
-
+public class Handshake implements Serializable {
+    private static final long serialVersionUID = 1L;
+    
     private static final int HANDSHAKE_HEADER_LENGTH = 18;
     private static final int ZERO_BITS_LENGTH = 10;
     private static final int PEER_ID_LENGTH = 4;
