@@ -357,8 +357,11 @@ public class Peer {
             setRemotePeerId(receivedHandshake.getPeerId());
             // Now that we know the peer ID thats coming in, we can set the null peerInfo object equal to the one we have in the peerInfo list.
             PeerInfoParser peerInfoParser = new PeerInfoParser();
+            peerInfoParser.readFile();
+            System.out.println(peerInfoParser.getPeerInfoList().toString());
             boolean success = false;
             for (PeerInfo peerInfo : peerInfoParser.getPeerInfoList()) {
+                System.out.println("Looked at Peer ID: " + peerInfo.getPeerID() + " against " + remotePeerId);
                 if (peerInfo.getPeerID() == remotePeerId) {
                     this.peerInfo = peerInfo;
                     success = true;
