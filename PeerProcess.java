@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
+import java.io.File;
 
 public class peerProcess {
 
@@ -40,10 +41,72 @@ public class peerProcess {
     private ServerSocket serverSocket;
     private List<Peer> connectedPeers = new ArrayList<Peer>();
     PeerInfo myPeerInfo = null;
+    private boolean allPeersHaveCompleteFile;
+
+    private FileManager fileManager;
 
     public peerProcess(int peerId) {
         this.myPeerId = peerId;
+
+        // Initialize FileManager after reading configuration
+        initializeFileManager();
     }
+
+    private void initializeFileManager() {
+        PeerInfoParser peerInfoParser = new PeerInfoParser();
+        peerInfoParser.readFile();
+        CommonParser commonParser = new CommonParser();
+        commonParser.readFile();
+
+        for (PeerInfo peerInfo : peerInfoParser.getPeerInfoList()) {
+            if (peerInfo.getPeerID() == myPeerId) {
+                myPeerInfo = peerInfo;
+                break;
+            }
+        }
+
+        boolean hasCompleteFile = myPeerInfo.hasFile();
+        String fileName = commonParser.getFileName();
+        int fileSize = commonParser.getFileSize();
+        int pieceSize = commonParser.getPieceSize();
+        this.fileManager = new FileManager(myPeerId, fileName, fileSize, pieceSize, hasCompleteFile);
+    }
+    
+    private void startFileExchange() {
+        // Start threads for each connected peer to handle file exchange
+        for (Peer peer : connectedPeers) {
+            new Thread(() -> handleFileExchangeWithPeer(peer)).start();
+        }
+
+        // Start a separate thread to check if all peers have completed file download
+        new Thread(this::checkAllPeersCompletion).start();
+    }
+
+    private void handleFileExchangeWithPeer(Peer peer) {
+        // Exchange bitfield messages
+        peer.exchangeBitfields();
+
+        // Main loop for exchanging pieces with this peer
+        while (!peer.isCompleted() && !allPeersHaveCompleteFile) {
+            // Logic for requesting and sending pieces
+            // This should be based on the peer's choking status and the pieces needed
+        }
+    }
+
+    private void checkAllPeersCompletion() {
+        while (!allPeersHaveCompleteFile) {
+            allPeersHaveCompleteFile = connectedPeers.stream()
+                                                     .allMatch(Peer::isCompleted);
+            try {
+                Thread.sleep(1000);  // Check periodically
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+    }
+
+    
 
     // 1. This gets called as soon as the program starts.
     public void start() throws IOException {
@@ -51,8 +114,6 @@ public class peerProcess {
         // Reads The PeerInfo.cfg file and common.cfg file
         PeerInfoParser peerInfoParser = new PeerInfoParser();
         peerInfoParser.readFile();
-        CommonParser commonParser = new CommonParser();
-        commonParser.readFile();
 
 
         // Finds the right PeerInfo object for the current peer, sets it to myPeerInfo
@@ -73,8 +134,11 @@ public class peerProcess {
 
         // Listen for new connections in a separate thread
         listenForNewConnections();
-    }
 
+        // Start file exchange
+        startFileExchange();
+        
+    }
 
     private void connectToEarlierPeers() {
         System.out.println("Connecting to earlier peers");

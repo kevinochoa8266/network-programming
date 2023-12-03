@@ -54,74 +54,7 @@ public class Peer {
         this.interested = interested;
     }
 
-    public void doHandshake(Peer peer){
-        try {
-            Handshake handshake = new Handshake(myPeerId);
-            ObjectOutputStream out = new ObjectOutputStream(peer.getSocket().getOutputStream());
-
-
-            // send handshake msg
-            byte[] handshakeBytes = handshake.getBytes();
-            out.writeInt(handshakeBytes.length);
-            out.write(handshakeBytes);
-            out.flush();
-
-            // check response
-            boolean isValidResponse = receiveHandshakeResponse(peer);
-            if (isValidResponse) {
-                // handle
-            }
-            else{
-                //handle
-            }
-        }
-        catch (IOException e){
-            e.printStackTrace();
-        }
-    }
-
-    public boolean receiveHandshakeResponse(Peer peer){
-        try {
-            ObjectInputStream in = new ObjectInputStream(peer.getSocket().getInputStream());
-
-            // length of message coming in
-            int messageLength = in.readInt();
-
-            // read bytes coming in
-            byte[] responseBytes = new byte[messageLength];
-            in.readFully(responseBytes);
-
-            Handshake responseHandshake = new Handshake(responseBytes);
-
-            boolean isValidResponse = validateHandshakeResponse(responseHandshake);
-
-            if (isValidResponse){
-                //send bitfield message
-
-            }
-            else{
-                // handle
-            }
-
-            return isValidResponse;
-
-        }
-        catch(IOException e){
-            e.printStackTrace();
-            return false;
-        }
-
-    }
-
-    public boolean validateHandshakeResponse(Handshake responseHandshake){
-        boolean isValidHeader = responseHandshake.getHandshakeHeader().equals("P2PFILESHARINGPROJ");
-        boolean isValidPeerId = responseHandshake.getPeerId() != 0;
-        boolean isValidResponse = isValidHeader && isValidPeerId;
-
-        return isValidResponse;
-    }
-
-    public void exchangeBitfields(Peer peer){
+    public void exchangeBitfields(){ // Uses the ogPeer and desiredPeer to exchange bitfields
 
     }
 
@@ -278,17 +211,6 @@ public class Peer {
     }
 
 
-    public void initServer(PeerInfoParser.PeerInfo peerinfo){
-        try {
-            thisServer = new Server();
-            Socket peerSocket = new Socket(peerinfo.getHostName(), peerinfo.getPortNumber());
-            setSocket(peerSocket);
-        } catch (IOException e) {
-            e.printStackTrace();
-            // connection error handle
-        }
-    }
-
     // OLD IMPLEMENTATION ABOVE
 
 
@@ -435,66 +357,39 @@ public class Peer {
     }
 
 
-        /*
-        // Receive handshake message
-        byte[] responseBytes = null;
-        try {
-            ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
-            Object obj = in.readObject();
-            if (!(obj instanceof Handshake)) {
-                System.out.println("Did not receive a Handshake object.");
-                System.out.println("Received: " + obj.getClass().getName());
-            }
-            Handshake incomingHandshake = (Handshake) obj;
-            responseBytes = incomingHandshake.getBytes();
-            System.out.println("Got:" + incomingHandshake.getHandshakeHeader());
-        } catch (Exception e) {
-            System.out.println("Error receiving handshake message: " + e.getMessage());
-        } finally {
-            if (responseBytes == null) {
-                throw new IOException("Handshake response message was null.");
-            }
-        }
 
-        Handshake responseHandshake = new Handshake(responseBytes);
-        System.out.println("Received handshake message from peer " + responseHandshake.getPeerId());
-        // Store the remote peer ID
-        setRemotePeerId(responseHandshake.getPeerId());
-        // Now that we know the peer ID thats coming in, we can set the null peerInfo object equal to the one we have in the peerInfo list.
-        PeerInfoParser peerInfoParser = new PeerInfoParser();
-        for (PeerInfo peerInfo : peerInfoParser.getPeerInfoList()) {
-            if (peerInfo.getPeerID() == remotePeerId) {
-                this.peerInfo = peerInfo;
-                break;
-            }
-        }
-
-        // Send handshake message
-        Handshake handshakeMessage = new Handshake(peerInfo.getPeerID());
-        if (!handshakeMessage.getHandshakeHeader().equals(responseHandshake.getHandshakeHeader())) {
-            throw new IOException("Invalid handshake header received.");
-        }
-
-        outputStream.writeObject(handshakeMessage.getBytes());
-        outputStream.flush();
-
-    }
-*/    
     public void setPeerInfo(PeerInfo peerInfo) {
         this.peerInfo = peerInfo;
     }
 
+    private FileManager fileManager;
+    public void setFileManager(FileManager fileManager) {
+        this.fileManager = fileManager;
+    }
 
+    public void handlePieceMessage(Piece pieceMessage) {
+        // Extract piece index and data from the message
+        int pieceIndex = pieceMessage.getPieceIndex();
+        byte[] pieceData = pieceMessage.getPieceData();
 
+        // Save the piece using FileManager
+        try {
+            fileManager.setPiece(pieceIndex, pieceData);
+            // After saving, check if download is complete or request next piece
+        } catch (IOException e) {
+            System.err.println("Failed to save piece: " + e.getMessage());
+        }
+    }
 
-
-
-
-
-
-
-
-
+    
+    boolean isChoked; // TODO: IMPLEMENT
+    public boolean getIsChoked() {
+        return isChoked;
+    }
+    boolean isComplete = false;
+    public boolean isCompleted() {
+        return isComplete;
+    }
 
 
 

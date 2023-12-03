@@ -35,5 +35,22 @@ public class Piece {
         return message;
     }
 
+    public int getMessageLength(){
+        buffer.rewind();
+        return buffer.getInt();
+    }
+
+    public int getPieceIndex(){
+        buffer.position(5);
+        return buffer.getInt();
+    }
+
+    public byte[] getPieceData(){
+        buffer.position(9);
+        byte[] data = new byte[buffer.capacity() - 9];
+        buffer.get(data);
+        return data;
+    }
+
 
 }
