@@ -33,9 +33,6 @@ public class Peer {
         this.peerId = peerId;
     }
 
-    public Socket getSocket() {
-        return socket;
-    }
 
     public void setSocket(Socket socket) {
         this.socket = socket;
@@ -305,12 +302,18 @@ public class Peer {
     public Peer(PeerInfo peerInfo) {
         this.peerInfo = peerInfo;
     }
-// Still working on this
-    public boolean initClientConnection(PeerInfoParser.PeerInfo origPeer, PeerInfoParser.PeerInfo desiredPeer){
-        this.origID = peerInfo.getPeerID();
 
-        try (Socket socket = new Socket(desiredPeer.getHostName(), desiredPeer.getPortNumber())) {
-            System.out.println("Connected to server on port " + desiredPeer.getPortNumber());
+    private Socket peerSocket;
+// This is for OUTGOING connections
+    public boolean initClientConnection(PeerInfoParser.PeerInfo origPeer, PeerInfoParser.PeerInfo desiredPeer){
+        this.origID = origPeer.getPeerID();
+
+        try (Socket newSocket = new Socket(desiredPeer.getHostName(), desiredPeer.getPortNumber())) {
+            System.out.println(origPeer.getPeerID()+":"+ origPeer.getPortNumber() + " socket connected to " + desiredPeer.getPeerID() + ":" + desiredPeer.getPortNumber());
+            peerSocket = newSocket;
+            remotePeerId = desiredPeer.getPeerID();
+            reversePerformHandshake(peerSocket);
+            return true;
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -329,11 +332,15 @@ public class Peer {
         return false;
     }
 
+    public Socket getSocket() {
+        return peerSocket;
+    }
+
     
     // Gets called from PeerServer, when a new connection is coming in.
     public void connect(Socket clientSocket) throws IOException {
         this.origID = peerInfo.getPeerID(); // Yes, even though this peer class is for the incoming peer, we initially give it the host's peer ID.
-        this.socket = clientSocket; // client socket is the incoming connection. This whole peer class is the incoming connection.
+        this.peerSocket = clientSocket; // client socket is the incoming connection. This whole peer class is the incoming connection.
        // outputStream = new ObjectOutputStream(socket.getOutputStream());
         //inputStream = new ObjectInputStream(socket.getInputStream());
         isConnected = true;
@@ -356,31 +363,33 @@ public class Peer {
     public int getRemotePeerId() {
         return remotePeerId;
     }
-    
 
-    private void performHandshake(Socket clientSocket) throws IOException {
-        System.out.println("Performing handshake with peer ");
+    private void receiveHandshake(Socket clientSocket) throws IOException {
+        System.out.println(origID + " attempting to receiving handshake from " + remotePeerId);
 
         // Receive handshake message
         byte[] receivedBytes = null;
         try {
-            ObjectInputStream inStream = new ObjectInputStream(socket.getInputStream());
+            ObjectInputStream inStream = new ObjectInputStream(clientSocket.getInputStream());
 			receivedBytes = (byte[]) inStream.readObject();
             Handshake receivedHandshake = new Handshake(receivedBytes);
+            /* 
             System.out.println("Got:" + receivedBytes.toString());
             System.out.println("Got:" + receivedHandshake.getHandshakeHeader());
             System.out.println("Got:" + receivedHandshake.getPeerId());
+            */
             setRemotePeerId(receivedHandshake.getPeerId());
             // Now that we know the peer ID thats coming in, we can set the null peerInfo object equal to the one we have in the peerInfo list.
             PeerInfoParser peerInfoParser = new PeerInfoParser();
             peerInfoParser.readFile();
-            System.out.println(peerInfoParser.getPeerInfoList().toString());
+            //System.out.println(peerInfoParser.getPeerInfoList().toString());
             boolean success = false;
             for (PeerInfo peerInfo : peerInfoParser.getPeerInfoList()) {
-                System.out.println("Looked at Peer ID: " + peerInfo.getPeerID() + " against " + remotePeerId);
+               // System.out.println("Looked at Peer ID: " + peerInfo.getPeerID() + " against " + remotePeerId);
                 if (peerInfo.getPeerID() == remotePeerId) {
                     this.peerInfo = peerInfo;
                     success = true;
+                    System.out.println(origID + " successfully received handshake from " + remotePeerId);
                     break;
                 }
             }
@@ -392,20 +401,37 @@ public class Peer {
 		} catch (ClassNotFoundException e) {
 			System.err.println(e);
 		}
-        
+    }
 
-        // Send handshake message
+    private void sendHandshake(Socket clientSocket) throws IOException {
         try {
-            System.out.println("Sending handshake to client");
-            ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+            System.out.println(origID + " attempting to send handshake to " + remotePeerId);
+            ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
             Handshake handshakeMessage = new Handshake(origID);
             byte[] handshakeBytes = handshakeMessage.getBytes();
             out.writeObject(handshakeBytes);
             out.flush();
-            System.out.println("Sent handshake to client");
+            System.out.println(origID + " sent handshake to " + remotePeerId);
         } catch (Exception e) {
             System.out.println("Error sending handshake message: " + e.getMessage());
         }
+    }
+    
+
+    private void performHandshake(Socket clientSocket) throws IOException {
+        // Receive handshake message
+        receiveHandshake(clientSocket);
+
+        // Send handshake message
+        sendHandshake(clientSocket);
+    }
+
+    private void reversePerformHandshake(Socket clientSocket) throws IOException {
+        // Send handshake message
+        sendHandshake(clientSocket);
+
+        // Receive handshake message
+        receiveHandshake(clientSocket);
     }
 
 

@@ -75,7 +75,7 @@ public class peerProcess {
         listenForNewConnections();
     }
 
-// What I was last working on
+
     private void connectToEarlierPeers() {
         System.out.println("Connecting to earlier peers");
         PeerInfoParser peerInfoParser = new PeerInfoParser();
@@ -91,10 +91,12 @@ public class peerProcess {
                 }
             }
         }
+        System.out.println("Done connecting to earlier peers");
     }
 
 
     private void listenForNewConnections() {
+        System.out.println(myPeerId +" listening for new connections");
         while (true) {
             try {
                 Socket clientSocket = serverSocket.accept();
