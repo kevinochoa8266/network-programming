@@ -1,5 +1,6 @@
 import Message.*;
 import Parser.PeerInfoParser;
+import Parser.PeerInfoParser.PeerInfo;
 
 import java.net.Socket;
 import java.io.IOException;
@@ -297,6 +298,67 @@ public class Peer {
             e.printStackTrace();
             // connection error handle
         }
+    }
+    private ObjectOutputStream outputStream;
+    private ObjectInputStream inputStream;
+    private boolean isConnected;
+
+    private PeerInfo peerInfo;
+    public Peer(PeerInfo peerInfo) {
+        this.peerInfo = peerInfo;
+    }
+    
+    public void connect(Socket clientSocket) throws IOException {
+        this.socket = clientSocket;
+        outputStream = new ObjectOutputStream(socket.getOutputStream());
+        inputStream = new ObjectInputStream(socket.getInputStream());
+        isConnected = true;
+    
+        // Perform handshake
+       // performHandshake();
+    }
+    
+    public void connect() throws IOException {
+        // This method is used for outgoing connections
+        connect(new Socket(peerInfo.getHostName(), peerInfo.getPortNumber()));
+    }
+
+    private static final int HANDSHAKE_HEADER_LENGTH = 18;
+    private static final int ZERO_BITS_LENGTH = 10;
+    private static final int PEER_ID_LENGTH = 4;
+    private int remotePeerId;
+
+    public void setRemotePeerId(int remotePeerId) {
+        this.remotePeerId = remotePeerId;
+    }
+
+    public int getRemotePeerId() {
+        return remotePeerId;
+    }
+
+    private void performHandshake() throws IOException {
+        // Send handshake message
+        Handshake handshakeMessage = new Handshake(peerInfo.getPeerID());
+
+        outputStream.writeObject(handshakeMessage.getBytes());
+        outputStream.flush();
+
+        // Receive handshake message
+        int responseLength = HANDSHAKE_HEADER_LENGTH + ZERO_BITS_LENGTH + PEER_ID_LENGTH;
+        byte[] responseBytes = new byte[responseLength];
+        inputStream.readFully(responseBytes);
+
+        Handshake responseHandshake = new Handshake(responseBytes);
+        if (!handshakeMessage.getHandshakeHeader().equals(responseHandshake.getHandshakeHeader())) {
+            throw new IOException("Invalid handshake header received.");
+        }
+
+        // Store the remote peer ID
+        setRemotePeerId(responseHandshake.getPeerId());
+    }
+    
+    public void setPeerInfo(PeerInfo peerInfo) {
+        this.peerInfo = peerInfo;
     }
 
 
