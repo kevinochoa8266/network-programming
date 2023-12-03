@@ -1,3 +1,4 @@
+// New code is at the bottom
 import Message.*;
 import Parser.PeerInfoParser;
 import Parser.PeerInfoParser.PeerInfo;
@@ -304,7 +305,7 @@ public class Peer {
     public Peer(PeerInfo peerInfo) {
         this.peerInfo = peerInfo;
     }
-
+// Still working on this
     public boolean initClientConnection(PeerInfoParser.PeerInfo origPeer, PeerInfoParser.PeerInfo desiredPeer){
         this.origID = peerInfo.getPeerID();
 
