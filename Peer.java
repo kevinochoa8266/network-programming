@@ -1,4 +1,5 @@
 import Message.*;
+import Parser.PeerInfoParser;
 
 import java.net.Socket;
 import java.io.IOException;
