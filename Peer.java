@@ -1,17 +1,20 @@
+// New code is at the bottom
 import Message.*;
 import Parser.PeerInfoParser;
+import Parser.PeerInfoParser.PeerInfo;
 
 import java.net.Socket;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-
 public class Peer {
     private int myPeerId;
     private int peerId;
     private Socket socket;
     private byte[] bitfield;
     private boolean interested;
+    public Server thisServer = null;
+
 
 
     public int getMyPeerId() {
@@ -30,9 +33,6 @@ public class Peer {
         this.peerId = peerId;
     }
 
-    public Socket getSocket() {
-        return socket;
-    }
 
     public void setSocket(Socket socket) {
         this.socket = socket;
@@ -277,14 +277,211 @@ public class Peer {
         }
     }
 
-    public void initConnection(PeerInfoParser.PeerInfo peerinfo){
+
+    public void initServer(PeerInfoParser.PeerInfo peerinfo){
         try {
+            thisServer = new Server();
             Socket peerSocket = new Socket(peerinfo.getHostName(), peerinfo.getPortNumber());
             setSocket(peerSocket);
         } catch (IOException e) {
             e.printStackTrace();
             // connection error handle
         }
+    }
+
+    // OLD IMPLEMENTATION ABOVE
+
+
+
+   // private ObjectOutputStream outputStream;
+   // private ObjectInputStream inputStream;
+    private boolean isConnected;
+    private int origID;
+
+    private PeerInfo peerInfo;
+    public Peer(PeerInfo peerInfo) {
+        this.peerInfo = peerInfo;
+    }
+
+    private Socket peerSocket;
+// This is for OUTGOING connections
+    public boolean initClientConnection(PeerInfoParser.PeerInfo origPeer, PeerInfoParser.PeerInfo desiredPeer){
+        this.origID = origPeer.getPeerID();
+
+        try (Socket newSocket = new Socket(desiredPeer.getHostName(), desiredPeer.getPortNumber())) {
+            System.out.println(origPeer.getPeerID()+":"+ origPeer.getPortNumber() + " socket connected to " + desiredPeer.getPeerID() + ":" + desiredPeer.getPortNumber());
+            peerSocket = newSocket;
+            remotePeerId = desiredPeer.getPeerID();
+            reversePerformHandshake(peerSocket);
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        /* 
+        try {
+
+
+            Socket peerSocket = new Socket(peerinfo.getHostName(), peerinfo.getPortNumber());
+            setSocket(peerSocket);
+        } catch (IOException e) {
+            e.printStackTrace();
+            // connection error handle
+        }
+        
+        */
+        return false;
+    }
+
+    public Socket getSocket() {
+        return peerSocket;
+    }
+
+    
+    // Gets called from PeerServer, when a new connection is coming in.
+    public void connect(Socket clientSocket) throws IOException {
+        this.origID = peerInfo.getPeerID(); // Yes, even though this peer class is for the incoming peer, we initially give it the host's peer ID.
+        this.peerSocket = clientSocket; // client socket is the incoming connection. This whole peer class is the incoming connection.
+       // outputStream = new ObjectOutputStream(socket.getOutputStream());
+        //inputStream = new ObjectInputStream(socket.getInputStream());
+        isConnected = true;
+    
+        // Perform handshake. 
+        performHandshake(clientSocket);
+    }
+    
+    public void connect() throws IOException {
+        // This method is used for outgoing connections
+        connect(new Socket(peerInfo.getHostName(), peerInfo.getPortNumber()));
+    }
+
+    private int remotePeerId;
+
+    public void setRemotePeerId(int remotePeerId) {
+        this.remotePeerId = remotePeerId;
+    }
+
+    public int getRemotePeerId() {
+        return remotePeerId;
+    }
+
+    private void receiveHandshake(Socket clientSocket) throws IOException {
+        System.out.println(origID + " attempting to receiving handshake from " + remotePeerId);
+
+        // Receive handshake message
+        byte[] receivedBytes = null;
+        try {
+            ObjectInputStream inStream = new ObjectInputStream(clientSocket.getInputStream());
+			receivedBytes = (byte[]) inStream.readObject();
+            Handshake receivedHandshake = new Handshake(receivedBytes);
+            /* 
+            System.out.println("Got:" + receivedBytes.toString());
+            System.out.println("Got:" + receivedHandshake.getHandshakeHeader());
+            System.out.println("Got:" + receivedHandshake.getPeerId());
+            */
+            setRemotePeerId(receivedHandshake.getPeerId());
+            // Now that we know the peer ID thats coming in, we can set the null peerInfo object equal to the one we have in the peerInfo list.
+            PeerInfoParser peerInfoParser = new PeerInfoParser();
+            peerInfoParser.readFile();
+            //System.out.println(peerInfoParser.getPeerInfoList().toString());
+            boolean success = false;
+            for (PeerInfo peerInfo : peerInfoParser.getPeerInfoList()) {
+               // System.out.println("Looked at Peer ID: " + peerInfo.getPeerID() + " against " + remotePeerId);
+                if (peerInfo.getPeerID() == remotePeerId) {
+                    this.peerInfo = peerInfo;
+                    success = true;
+                    System.out.println(origID + " successfully received handshake from " + remotePeerId);
+                    break;
+                }
+            }
+            if (success == false) {
+                System.out.println("ALERT: Peer ID not found in peer info list. USING duplicate peer ID.");
+            }
+		} catch (IOException e) {
+			System.err.println(e);
+		} catch (ClassNotFoundException e) {
+			System.err.println(e);
+		}
+    }
+
+    private void sendHandshake(Socket clientSocket) throws IOException {
+        try {
+            System.out.println(origID + " attempting to send handshake to " + remotePeerId);
+            ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
+            Handshake handshakeMessage = new Handshake(origID);
+            byte[] handshakeBytes = handshakeMessage.getBytes();
+            out.writeObject(handshakeBytes);
+            out.flush();
+            System.out.println(origID + " sent handshake to " + remotePeerId);
+        } catch (Exception e) {
+            System.out.println("Error sending handshake message: " + e.getMessage());
+        }
+    }
+    
+
+    private void performHandshake(Socket clientSocket) throws IOException {
+        // Receive handshake message
+        receiveHandshake(clientSocket);
+
+        // Send handshake message
+        sendHandshake(clientSocket);
+    }
+
+    private void reversePerformHandshake(Socket clientSocket) throws IOException {
+        // Send handshake message
+        sendHandshake(clientSocket);
+
+        // Receive handshake message
+        receiveHandshake(clientSocket);
+    }
+
+
+        /*
+        // Receive handshake message
+        byte[] responseBytes = null;
+        try {
+            ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
+            Object obj = in.readObject();
+            if (!(obj instanceof Handshake)) {
+                System.out.println("Did not receive a Handshake object.");
+                System.out.println("Received: " + obj.getClass().getName());
+            }
+            Handshake incomingHandshake = (Handshake) obj;
+            responseBytes = incomingHandshake.getBytes();
+            System.out.println("Got:" + incomingHandshake.getHandshakeHeader());
+        } catch (Exception e) {
+            System.out.println("Error receiving handshake message: " + e.getMessage());
+        } finally {
+            if (responseBytes == null) {
+                throw new IOException("Handshake response message was null.");
+            }
+        }
+
+        Handshake responseHandshake = new Handshake(responseBytes);
+        System.out.println("Received handshake message from peer " + responseHandshake.getPeerId());
+        // Store the remote peer ID
+        setRemotePeerId(responseHandshake.getPeerId());
+        // Now that we know the peer ID thats coming in, we can set the null peerInfo object equal to the one we have in the peerInfo list.
+        PeerInfoParser peerInfoParser = new PeerInfoParser();
+        for (PeerInfo peerInfo : peerInfoParser.getPeerInfoList()) {
+            if (peerInfo.getPeerID() == remotePeerId) {
+                this.peerInfo = peerInfo;
+                break;
+            }
+        }
+
+        // Send handshake message
+        Handshake handshakeMessage = new Handshake(peerInfo.getPeerID());
+        if (!handshakeMessage.getHandshakeHeader().equals(responseHandshake.getHandshakeHeader())) {
+            throw new IOException("Invalid handshake header received.");
+        }
+
+        outputStream.writeObject(handshakeMessage.getBytes());
+        outputStream.flush();
+
+    }
+*/    
+    public void setPeerInfo(PeerInfo peerInfo) {
+        this.peerInfo = peerInfo;
     }
 
 
