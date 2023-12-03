@@ -5,13 +5,14 @@ import java.net.Socket;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-
 public class Peer {
     private int myPeerId;
     private int peerId;
     private Socket socket;
     private byte[] bitfield;
     private boolean interested;
+    public Server thisServer = null;
+
 
 
     public int getMyPeerId() {
@@ -279,6 +280,17 @@ public class Peer {
 
     public void initConnection(PeerInfoParser.PeerInfo peerinfo){
         try {
+            Socket peerSocket = new Socket(peerinfo.getHostName(), peerinfo.getPortNumber());
+            setSocket(peerSocket);
+        } catch (IOException e) {
+            e.printStackTrace();
+            // connection error handle
+        }
+    }
+
+    public void initServer(PeerInfoParser.PeerInfo peerinfo){
+        try {
+            thisServer = new Server();
             Socket peerSocket = new Socket(peerinfo.getHostName(), peerinfo.getPortNumber());
             setSocket(peerSocket);
         } catch (IOException e) {
