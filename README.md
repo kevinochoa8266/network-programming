@@ -1,34 +1,20 @@
-# ryanTemp branch - Read this:
-/*
- * 
- * PeerProcess.java is the entry point for the program.
- * 
- * 1. It starts the server for the current peer. (The one that is running this program)
- * 2. It connects to earlier peers, and stores the successful 
- * connections in the connectedPeers list.
- *
- * 3. It listens for new connections, and creates a new thread to handle each new connection.
- * 
- * The main function calls peerProcess.start()
- * 
- * There are two main objects to be aware of. The PeerInfo object, and the Peer object.
- * Pearinfo comes from PeerInfoParser, and hold data like peerID, hostName, portNumber.
- * (and also a list of all peers from the PeerInfo.cfg file, (this list must be populated by PeerInfoParser.readFile() first)
- * 
- * The second main object is the Peer object. Every peer that this peer connects to will become a Peer object.
- * You control the connection to another Peer by calling it's Peer object functions.
- * 
- * Current State:
- * 
- * The program is capable of connecting to other peers based off my testing with ServerTestClient.java 
- * (which is a barebones simulation of a peer). Handshaking is working, and I am currently working on
- * getting peers (Copies of this code) to automatically connect to each other.
- * 
- * 
- */
- # Issues
- A lot of the code from main is mixed in with the new code, which may make this somewhat confusing. I need to refactor and modify the old code to work with this structure.
 
+
+# Bryan Torreblanca Contribution:
+
+I have implemented a feature that reads the Common.cfg and PeerInfo.cfg files. This ensures that essential variables, such as peer information and common configuration settings, are correctly set for each peer.
+I helped implement a crucial aspect of the program where each peer initiates TCP connections with all peers that started before it. This functionality is crucial for creating the peer network required for file sharing. 
+Also, I collaborated with my peers to get as much work done as possible and I believe we all contributed equally to the project.
+
+# Ryan Rodriguez Contribution:
+
+To adhere to the protocol, I have implemented a handshake message exchange between connected peers. This ensures a secure initiation of communication between peers.
+I attempted the implementation of exchanging bitfield messages, a critical component for peers to understand each other's available pieces and facilitate the sharing process. 
+I attempted sends 'interested' or 'not interested' messages as required by the protocol, reflecting the dynamic interests of peers in the shared file. I helped my group with debugging and coding through discord sessions and screen sharing as well.
+
+
+# Kevin Ochoa Contribution:
+I created the skeleton code for the project and the set up. I helped implement a crucial aspect of the program where each peer initiates TCP connections with all peers that started before it. This functionality is crucial for creating the peer network required for file sharing. I coded together with my group to debug and implement different areas of the program.
 
 # CNT4007 - network-programming
 
