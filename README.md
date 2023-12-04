@@ -4,7 +4,7 @@
 
 I have implemented a feature that reads the Common.cfg and PeerInfo.cfg files. This ensures that essential variables, such as peer information and common configuration settings, are correctly set for each peer.
 I helped implement a crucial aspect of the program where each peer initiates TCP connections with all peers that started before it. This functionality is crucial for creating the peer network required for file sharing. 
-Also, I collaborated with my peers to get as much work done as possible and I believe we all contributed equally to the project.
+Also, I collaborated with my peers to get as much work done as possible.
 
 # Ryan Rodriguez Contribution:
 
