@@ -323,6 +323,7 @@ public class peerProcess {
     private void handleNewConnection(Socket clientSocket) throws ClassNotFoundException, IOException {
         try {
             // Perform the handshake and exchange bitfields
+            logger.logTcpConnectionFrom(myPeerId, clientSocket.getPort());
             Peer newPeer = new Peer(myPeerId, clientSocket); // Pass the current peer's ID and client socket
             boolean handshakeSuccess = true; // FIXME ASAP isHandshakeSuccessful = newPeer.performHandshake();
 

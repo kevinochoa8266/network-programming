@@ -42,7 +42,7 @@ public class CommonParser {
             e.printStackTrace();
         }
         // Enable for Debugging
-        printVals();
+      //  printVals();
     }
 
 
