@@ -9,10 +9,13 @@ public class FileManager {
     private final int pieceSize;
     private final BitSet bitfield;
     private final boolean hasFileInitially;
+    private Logger logger;
+    private int peerID;
 
     public FileManager(int peerId, String fileName, int fileSize, int pieceSize, boolean hasFileInitially) {
         //System.out.println("FileManager: peerId=" + peerId + ", fileName=" + fileName + ", fileSize=" + fileSize + ", pieceSize=" + pieceSize + ", hasFileInitially=" + hasFileInitially);
-        
+        logger = new Logger(peerId);
+        this.peerID = peerId;
         // Get the directory of the current Java file
         Path currentDir = Paths.get("").toAbsolutePath();
         //System.out.println("Current directory: " + currentDir);
@@ -64,11 +67,14 @@ public class FileManager {
     public synchronized boolean hasPiece(int pieceIndex) {
         return bitfield.get(pieceIndex);
     }
-
     public synchronized void setPiece(int pieceIndex, byte[] data) throws IOException {
         if (!bitfield.get(pieceIndex)) {
             writeFilePiece(pieceIndex, data);
             bitfield.set(pieceIndex);
+            logger.logDownloadingPiece(peerID, peerID+1, pieceIndex, bitfield.cardinality());
+            if (isDownloadComplete()) {
+                logger.logCompletionOfDownload(peerID);
+            }
         }
     }
 

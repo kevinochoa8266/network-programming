@@ -1,39 +1,21 @@
-/*
- * 
- * PeerProcess.java is the entry point for the program.
- * 
- * 1. It starts the server for the current peer. (The one that is running this program)
- * 2. It connects to earlier peers, and stores the successful connections in 
- *   the connectedPeers list.
- * 3. It listens for new connections, and creates a new thread to handle each new connection.
- * 
- * The main function calls peerProcess.start()
- * 
- * There are two main objects to be aware of. The PeerInfo object, and the Peer object.
- * Pearinfo comes from PeerInfoParser, and hold data like peerID, hostName, portNumber.
- * (and also a list of all peers from the PeerInfo.cfg file, (this list must be populated by PeerInfoParser.readFile() first)
- * 
- * The second main object is the Peer object. Every peer that this peer connects to will become a Peer object.
- * You control the connection to another Peer by calling it's Peer object functions.
- * 
- * Current State:
- * 
- * The program is capable of connecting to other peers based off my testing with ServerTestClient.java 
- * (which is a barebones simulation of a peer). Handshaking is working, and I am currently working on
- * getting peers (Copies of this code) to automatically connect to each other.
- * 
- * 
- */
+
 import Parser.CommonParser;
 import Parser.PeerInfoParser;
 import Parser.PeerInfoParser.PeerInfo;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.io.File;
+import java.util.stream.Collectors;
 
 public class peerProcess {
 
@@ -42,13 +24,25 @@ public class peerProcess {
     private List<Peer> connectedPeers = new ArrayList<Peer>();
     PeerInfo myPeerInfo = null;
     private boolean allPeersHaveCompleteFile;
+    public int unchokingInterval;
+    public int optimisticUnchokingInterval;
+    private Peer optimisticallyUnchokedPeer;
+    private final List<Peer> preferredNeighbors = new ArrayList<>();
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private final List<RateRecord> downloadRates = new ArrayList<>();
+    private final Random random = new Random();
+    private int numPreferredNeighbors;
+    private Logger logger;
+
 
     private FileManager fileManager;
 
     public peerProcess(int peerId) {
         this.myPeerId = peerId;
-
-        // Initialize FileManager after reading configuration
+        logger = new Logger(myPeerId);
+        CommonParser commonParser = new CommonParser();
+        commonParser.readFile();
+        numPreferredNeighbors = commonParser.getNumberOfPreferredNeighbors();
         initializeFileManager();
     }
 
@@ -57,7 +51,9 @@ public class peerProcess {
         peerInfoParser.readFile();
         CommonParser commonParser = new CommonParser();
         commonParser.readFile();
-
+        unchokingInterval = commonParser.getUnchokingInterval();
+        optimisticUnchokingInterval = commonParser.getOptimisticUnchokingInterval();
+        
         for (PeerInfo peerInfo : peerInfoParser.getPeerInfoList()) {
             if (peerInfo.getPeerID() == myPeerId) {
                 myPeerInfo = peerInfo;
@@ -69,20 +65,153 @@ public class peerProcess {
         String fileName = commonParser.getFileName();
         int fileSize = commonParser.getFileSize();
         int pieceSize = commonParser.getPieceSize();
-        this.fileManager = new FileManager(myPeerId, fileName, fileSize, pieceSize, hasCompleteFile);
-    }
-    
-    private void startFileExchange() {
-        // Start threads for each connected peer to handle file exchange
-        for (Peer peer : connectedPeers) {
-            new Thread(() -> handleFileExchangeWithPeer(peer)).start();
+        try {
+            this.fileManager = new FileManager(myPeerId, fileName, fileSize, pieceSize, hasCompleteFile);
+        } catch (Exception e) {
+            System.out.println("Error initializing file manager: " + e.getMessage());
         }
+    }
+    private void initPreferredNeighbors() {
+        if (preferredNeighbors.isEmpty() && connectedPeers.size() > 0) {
+            // If preferred neighbors list is empty, make initial selection
+            preferredNeighbors.addAll(connectedPeers.subList(0, Math.min(numPreferredNeighbors, connectedPeers.size())));
+            for (Peer peer : preferredNeighbors) {
+                try {
+                    unchokePeer(peer);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        logger.logChangeOfPreferredNeighbors(myPeerId, preferredNeighbors.stream()
+        .map(p -> String.valueOf(p.getPeerId()))
+        .collect(Collectors.joining(",")));
+        
+    }
+
+    private void selectOptimistically() {
+        // Your implementation here
+    }
+
+    private void startFileExchange() {
+        // Initialize preferred neighbors
+        initPreferredNeighbors();
+        
+        // Start threads for each connected peer to handle file exchange
+        int UnchokedNeighbor = 0; // Define UnchokedNeighbor variable
+
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                reselectPreferredNeighbors();
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }, 0, unchokingInterval, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(this::selectOptimistically, 0, optimisticUnchokingInterval, TimeUnit.SECONDS);
+        for (Peer peer : connectedPeers) {
+            new Thread(() -> {
+                try {
+                    handleFileExchangeWithPeer(peer);
+                } catch (ClassNotFoundException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }).start();
+        }
+
 
         // Start a separate thread to check if all peers have completed file download
         new Thread(this::checkAllPeersCompletion).start();
     }
 
-    private void handleFileExchangeWithPeer(Peer peer) {
+    private void reselectPreferredNeighbors() throws IOException {
+        // Sort the downloadRates list based on rates, from high to low
+        downloadRates.sort((a, b) -> Long.compare(b.getRate(), a.getRate()));
+
+        List<Peer> newPreferredNeighbors = new ArrayList<>();
+        for(int i = 0; i < Math.min(numPreferredNeighbors, downloadRates.size()); i++) {
+            int peerId = downloadRates.get(i).getPeerId();
+            connectedPeers.stream()
+                .filter(p -> p.getPeerId() == peerId)
+                .findFirst()
+                .ifPresent(newPreferredNeighbors::add);
+        }
+
+        // Unchoke new preferred neighbors and choke others
+        for (Peer connectedPeer : connectedPeers) {
+            if (newPreferredNeighbors.contains(connectedPeer)) {
+                unchokePeer(connectedPeer);
+            } else {
+                chokePeer(connectedPeer);
+            }
+        }
+
+        // Update the list of preferred neighbors
+        preferredNeighbors.clear();
+        preferredNeighbors.addAll(newPreferredNeighbors);
+    }
+    
+    private void selectOptimisticallyUnchokedNeighbor() throws IOException {
+        List<Peer> chokedInterestedPeers = connectedPeers.stream()
+            .filter(Peer::isInterested) // Only interested peers
+            .filter(p -> !preferredNeighbors.contains(p)) // Not already in preferred neighbors
+            .collect(Collectors.toList());
+
+        if (!chokedInterestedPeers.isEmpty()) {
+            int randomIndex = random.nextInt(chokedInterestedPeers.size());
+            Peer selectedPeer = chokedInterestedPeers.get(randomIndex);
+
+            if (optimisticallyUnchokedPeer != null) {
+                chokePeer(optimisticallyUnchokedPeer); // Choke previously optimistically unchoked peer
+            }
+            optimisticallyUnchokedPeer = selectedPeer;
+            unchokePeer(optimisticallyUnchokedPeer); // Unchoke the new optimistically unchoked peer
+        }
+        if (optimisticallyUnchokedPeer != null) {
+            logger.logChangeOfOptimisticallyUnchokedNeighbor(myPeerId, optimisticallyUnchokedPeer.getPeerId());
+        }
+    }
+    
+    private void chokePeer(Peer peer) throws IOException {
+        peer.sendChokeMessage();
+    }
+    
+    private void unchokePeer(Peer peer) throws IOException {
+        peer.sendUnchokeMessage();
+    }
+
+    private void updateDownloadRate(int peerId, long downloadedBytes) {
+        RateRecord rateRecord = downloadRates.stream()
+                                             .filter(r -> r.getPeerId() == peerId)
+                                             .findFirst()
+                                             .orElse(new RateRecord(peerId));
+        // Assuming 'downloadedBytes' is the amount of data downloaded since the last rate update
+        rateRecord.setRate(downloadedBytes); // Set the new download rate
+    }
+
+    private void resetDownloadRates() {
+        downloadRates.clear();
+    }
+
+    private void onPieceDownloaded(Peer fromPeer, int pieceIndex, byte[] pieceData) throws IOException {
+        fileManager.setPiece(pieceIndex, pieceData);
+        RateRecord rateRecord = downloadRates.stream()
+            .filter(r -> r.getPeerId() == fromPeer.getPeerId())
+            .findFirst()
+            .orElseGet(() -> {
+                RateRecord newRecord = new RateRecord(fromPeer.getPeerId());
+                downloadRates.add(newRecord);
+                return newRecord;
+            });
+        rateRecord.addDownloadedBytes(pieceData.length);
+    }
+
+
+    private void handleFileExchangeWithPeer(Peer peer) throws ClassNotFoundException, IOException {
         // Exchange bitfield messages
         peer.exchangeBitfields();
 
@@ -117,6 +246,7 @@ public class peerProcess {
 
 
         // Finds the right PeerInfo object for the current peer, sets it to myPeerInfo
+        // We should probably modify to create a peer for self and have the var in peerProcess.
         for (PeerInfo peerInfo : peerInfoParser.getPeerInfoList()) {
             if (peerInfo.getPeerID() == myPeerId) {
                 myPeerInfo = peerInfo;
@@ -141,7 +271,7 @@ public class peerProcess {
     }
 
     private void connectToEarlierPeers() {
-        System.out.println("Connecting to earlier peers");
+        //System.out.println("Connecting to earlier peers");
         PeerInfoParser peerInfoParser = new PeerInfoParser();
         peerInfoParser.readFile();
         for (PeerInfo peerInfo : peerInfoParser.getPeerInfoList()) {
@@ -150,66 +280,100 @@ public class peerProcess {
                 boolean status = desiredPeer.initClientConnection(myPeerInfo, peerInfo);
                 if (status == true) {
                     connectedPeers.add(desiredPeer);
-                }else {
-                    System.out.println("Failed to connect to peer " + peerInfo.getPeerID());
+                    logger.logTcpConnection(Integer.valueOf(myPeerId), desiredPeer.getPeerId());
+                } else {
+                    //System.out.println("Failed to connect to peer " + peerInfo.getPeerID());
                 }
             }
         }
-        System.out.println("Done connecting to earlier peers");
+        //System.out.println("Done connecting to earlier peers");
     }
 
 
     private void listenForNewConnections() {
-        System.out.println(myPeerId +" listening for new connections");
+        //System.out.println(myPeerId +" listening for new connections");
         while (true) {
-            try {
-                Socket clientSocket = serverSocket.accept();
+            
+                Socket clientSocket;
+                try {
+                    clientSocket = serverSocket.accept();
+                } catch (IOException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
                 // Handling the new connection in a separate thread
-                new Thread(() -> handleNewConnection(clientSocket)).start();
-            } catch (IOException e) {
-                System.out.println("Error accepting new connection: " + e.getMessage());
-                break;
-            }
+                new Thread(() -> {
+                    try {
+                        final Socket finalClientSocket = serverSocket.accept(); // Declare and initialize the final variable
+                        handleNewConnection(finalClientSocket);
+                    } catch (ClassNotFoundException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }).start();
+
         }
     }
+        
     
     // Whenever a new connection comes in, this handles it for the server.
-    private void handleNewConnection(Socket clientSocket) {
+    private void handleNewConnection(Socket clientSocket) throws ClassNotFoundException, IOException {
         try {
-            Peer newPeer = new Peer(myPeerInfo); // Creates a Peer object for the incoming connection. Sets to this peer's number for now.
+            // Perform the handshake and exchange bitfields
+            Peer newPeer = new Peer(myPeerId, clientSocket); // Pass the current peer's ID and client socket
+            boolean handshakeSuccess = true; // FIXME ASAP isHandshakeSuccessful = newPeer.performHandshake();
 
-            newPeer.connect(clientSocket); // Uses the Peer class to establish a connection and perform handshake. Passes in the socket.
+            if (handshakeSuccess) {
+                // using clientsocket.port, figure out the peerID of the peer that connected to you
 
-            int connectedPeerId = newPeer.getRemotePeerId(); // Retrieve peer ID from handshake
+                logger.logTcpConnectionFrom(myPeerId, newPeer.getRemotePeerId());
+                // Successfully performed handshake, now exchange bitfields
+                newPeer.exchangeBitfields(); // Initiate bitfield exchange
 
-            PeerInfoParser peerInfoParser = new PeerInfoParser(); // Declare and initialize peerInfoParser
-            peerInfoParser.readFile(); // Read the peer info file
+                // Retrieve the remote peer ID from the handshake
+                int connectedPeerId = newPeer.getRemotePeerId();
 
-            List<PeerInfoParser.PeerInfo> peerInfoList = peerInfoParser.getPeerInfoList(); // Get the list of PeerInfo objects
-            PeerInfoParser.PeerInfo peerInfo = null;
-            for (PeerInfoParser.PeerInfo info : peerInfoList) {
-                if (info.getPeerID() == connectedPeerId) {
-                    peerInfo = info;
-                    break;
+                // Access the peer info list and find the PeerInfo for the remote peer ID
+                PeerInfoParser peerInfoParser = new PeerInfoParser();
+                peerInfoParser.readFile();
+                PeerInfo remotePeerInfo = peerInfoParser.getPeerInfoList().get(connectedPeerId);
+                if (remotePeerInfo != null) {
+                    // Set remote peer information and start handling file exchange
+                    newPeer.setPeerInfo(remotePeerInfo);
+                    connectedPeers.add(newPeer); // Add the peer to the list of connected peers
+                    new Thread(() -> {
+                        try {
+                            handleFileExchangeWithPeer(newPeer);
+                        } catch (ClassNotFoundException | IOException e) {
+                            
+                            e.printStackTrace();
+                        }
+                    }).start();
+                } else {
+                    //System.out.println("PeerInfo not found for connected peer ID: " + connectedPeerId);
                 }
-            }
-
-            if (peerInfo != null) {
-                newPeer.setPeerInfo(peerInfo); // Set the correct PeerInfo
-                connectedPeers.add(newPeer);
-                // TODO: Handle initial communication with the new peer
             } else {
-                System.out.println("PeerInfo not found for connected peer: " + connectedPeerId);
+                //System.out.println("Handshake failed with peer using socket: " + clientSocket);
             }
-        } catch (IOException e) {
-            System.out.println("Error handling new connection: " + e.getMessage());
-        } catch (Exception e) {
-            System.out.println("Error: " + e.getMessage());
+        } catch (IOException | ClassNotFoundException e) {
+           // System.out.println("Error handling new connection: " + e.getMessage());
         }
     }
 
-
-
+    private void registerPeer(Peer newPeer, Socket clientSocket) {
+        connectedPeers.add(newPeer);
+        new Thread(() -> {
+            try {
+                handleFileExchangeWithPeer(newPeer);
+            } catch (ClassNotFoundException | IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }).start();
+    }
 
 
     public static void main(String[] args) {
@@ -230,38 +394,45 @@ public class peerProcess {
             System.out.println("Failed to start the peer process: " + e.getMessage());
         }
     }
+    
+    public static class RateRecord {
+        private final int peerId;
+        private long downloadedBytesSinceLastInterval;
+        private long cumulativeBytes;
+
+        public RateRecord(int peerId) {
+            this.peerId = peerId;
+            this.downloadedBytesSinceLastInterval = 0;
+            this.cumulativeBytes = 0;
+        }
+
+        public int getPeerId() {
+            return peerId;
+        }
+
+        public synchronized void setRate(long bytes) {
+            downloadedBytesSinceLastInterval = bytes;
+        }
+
+        public long getRate() {
+            // Returns the download rate since the last update
+            return downloadedBytesSinceLastInterval;
+        }
+
+        public synchronized void addDownloadedBytes(long bytes) {
+            downloadedBytesSinceLastInterval += bytes;
+            cumulativeBytes += bytes;
+        }
+
+        public synchronized void resetRate() {
+            downloadedBytesSinceLastInterval = 0;
+        }
+    }
+
+    
+
+
 }
 
 
 
-
-    /* 
-    public static void main(String[] args) {
-
-        System.out.println("Startup");
-
-        // read.File() function to read in the config files (Common & PeerInfo)
-        PeerInfoParser peerInfoParser = new PeerInfoParser();
-        peerInfoParser.readFile();
-        CommonParser commonParser = new CommonParser();
-        commonParser.readFile();
-
-        // current peer
-        int myPeerID = Integer.parseInt(args[0]);
-
-        // new obj for current peer
-        Peer currPeer = new Peer();
-        currPeer.setMyPeerId(myPeerID);
-
-        List<PeerInfo> peerInfoList = peerInfoParser.getPeerInfoList();
-
-        for (PeerInfo peerinfo : peerInfoList) {
-            if (peerinfo.getPeerID() < myPeerID) {
-                // Assuming you have a method to establish a connection with a peer
-                currPeer.initConnection(peerinfo);
-            }
-        }
-
-
-    }
-    */
