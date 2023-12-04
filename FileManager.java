@@ -11,17 +11,25 @@ public class FileManager {
     private final boolean hasFileInitially;
 
     public FileManager(int peerId, String fileName, int fileSize, int pieceSize, boolean hasFileInitially) {
-        // Updated file path to include peer-specific subdirectory
-        String directoryName = "peer_" + peerId;
-        this.filePath = Paths.get(System.getProperty("user.home"), "project", directoryName, fileName);
+        //System.out.println("FileManager: peerId=" + peerId + ", fileName=" + fileName + ", fileSize=" + fileSize + ", pieceSize=" + pieceSize + ", hasFileInitially=" + hasFileInitially);
         
-        // Ensure the directory exists
+        // Get the directory of the current Java file
+        Path currentDir = Paths.get("").toAbsolutePath();
+        //System.out.println("Current directory: " + currentDir);
+
+
+        String directoryName = "peer_" + peerId;
+        this.filePath = Paths.get(currentDir.toString(), directoryName, fileName);
+        
+        // Create directory
         try {
             Files.createDirectories(filePath.getParent());
         } catch (IOException e) {
             throw new UncheckedIOException("Could not create directories for peer " + peerId, e);
+        } catch (Exception e) {
+            System.out.println("FileManager: error creating directories for peer " + peerId + ": " + e.getMessage());
         }
-
+       // System.out.println("FileManager: filePath=" + filePath);
         this.fileSize = fileSize;
         this.pieceSize = pieceSize;
         this.bitfield = new BitSet(getNumberOfPieces());
@@ -30,7 +38,12 @@ public class FileManager {
         File file = filePath.toFile();
         if (hasFileInitially) {
             initializeBitfieldForCompleteFile();
-            splitFileIntoPieces();
+            try {
+                splitFileIntoPieces();
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
         } else {
             clearBitfield();
         }
@@ -66,7 +79,7 @@ public class FileManager {
         return readFilePiece(pieceIndex);
     }
 
-    private void splitFileIntoPieces() {
+    private void splitFileIntoPieces() throws IOException {
         try (RandomAccessFile raf = new RandomAccessFile(filePath.toFile(), "r")) {
             for (int pieceIndex = 0; pieceIndex < getNumberOfPieces(); pieceIndex++) {
                 raf.seek((long) pieceIndex * pieceSize);
@@ -75,9 +88,8 @@ public class FileManager {
                 setPiece(pieceIndex, data);
             }
         } catch (IOException e) {
-            System.out.println("Error splitting file into pieces: " + e.getMessage());
+            throw new IOException("Error splitting file into pieces", e);
         }   
-
     }
 
     private void writeFilePiece(int pieceIndex, byte[] data) throws IOException {
