@@ -125,4 +125,19 @@ public class FileManager {
     public BitSet getBitfield() {
         return (BitSet) bitfield.clone();
     }
+
+    public boolean hasPieces() {
+        return bitfield.cardinality() > 0;
+    }
+
+    public synchronized boolean isInterested(BitSet receivedBitfield) {
+        // Returns true if there exists at least one bit set to true in the receivedBitfield
+        // that is set to false in this peer's bitfield (meaning this peer is missing the piece)
+        BitSet clone = (BitSet) bitfield.clone();
+        clone.flip(0, getNumberOfPieces()); // Flip bitfield to mark the missing pieces with true
+        clone.and(receivedBitfield); // Perform logical AND with received bitfield
+        return clone.cardinality() > 0;  // If there's at least one bit set, then this peer is interested
+    }
 }
+
+
